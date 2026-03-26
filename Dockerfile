@@ -28,8 +28,9 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
     chown -R debian-tor:debian-tor /var/lib/tor/hidden_service && \
     chmod 700 /var/lib/tor/hidden_service
 
-# Note: Make sure 'daemon off;' is REMOVED from your nginx.conf 
-# so Nginx runs in the background, allowing Tor to run in the foreground.
+# Copiamos el script de arranque y le damos permisos de ejecución
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Start SSH and Nginx as services, then run Tor in the foreground
-CMD service ssh start && service nginx start && su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
+# Ejecutamos el script al iniciar el contenedor
+CMD ["/usr/local/bin/entrypoint.sh"]
