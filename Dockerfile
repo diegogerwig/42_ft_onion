@@ -31,5 +31,5 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
 # Note: Make sure 'daemon off;' is REMOVED from your nginx.conf 
 # so Nginx runs in the background, allowing Tor to run in the foreground.
 
-# Start SSH daemon, Nginx, and finally Tor in the foreground
-CMD /usr/sbin/sshd && nginx && su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
+# Start SSH and Nginx as services, then run Tor in the foreground
+CMD service ssh start && service nginx start && su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
