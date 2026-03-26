@@ -20,5 +20,4 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
     chown -R debian-tor:debian-tor /var/lib/tor/hidden_service && \
     chmod 700 /var/lib/tor/hidden_service
 
-# ¡AQUÍ ESTÁ LA MAGIA! Usamos ';' para que no se bloqueen entre ellos
 CMD /usr/sbin/sshd ; nginx ; su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
