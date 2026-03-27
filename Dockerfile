@@ -11,7 +11,6 @@ RUN useradd -m -s /bin/bash onionuser && \
 
 RUN mkdir -p /run/sshd
 
-# ¡NUEVO!: Generamos las claves de SSH para evitar que falle al arrancar
 RUN ssh-keygen -A
 
 COPY index.html /var/www/html/index.html
@@ -23,8 +22,6 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
     chown -R debian-tor:debian-tor /var/lib/tor/hidden_service && \
     chmod 700 /var/lib/tor/hidden_service
 
-# ¡NUEVO!: Escribimos el script directamente en Linux para que sea infalible.
-# El símbolo '&' envía todo al fondo para que nada se atasque.
 RUN echo '#!/bin/bash' > /start.sh && \
     echo '/usr/sbin/sshd' >> /start.sh && \
     echo 'nginx &' >> /start.sh && \
@@ -38,5 +35,4 @@ RUN echo '#!/bin/bash' > /start.sh && \
     echo 'tail -f /dev/null' >> /start.sh && \
     chmod +x /start.sh
 
-# Ejecutamos nuestro script blindado
 CMD ["/start.sh"]
