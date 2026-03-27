@@ -11,6 +11,9 @@ RUN useradd -m -s /bin/bash onionuser && \
 
 RUN mkdir -p /run/sshd
 
+# ¡NUEVO!: Generamos las claves de SSH para evitar que falle al arrancar
+RUN ssh-keygen -A
+
 COPY index.html /var/www/html/index.html
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY sshd_config /etc/ssh/sshd_config
@@ -20,4 +23,20 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
     chown -R debian-tor:debian-tor /var/lib/tor/hidden_service && \
     chmod 700 /var/lib/tor/hidden_service
 
-CMD /usr/sbin/sshd ; nginx ; su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
+# ¡NUEVO!: Escribimos el script directamente en Linux para que sea infalible.
+# El símbolo '&' envía todo al fondo para que nada se atasque.
+RUN echo '#!/bin/bash' > /start.sh && \
+    echo '/usr/sbin/sshd' >> /start.sh && \
+    echo 'nginx &' >> /start.sh && \
+    echo 'su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc" &' >> /start.sh && \
+    echo 'echo "Esperando a la red Tor..."' >> /start.sh && \
+    echo 'sleep 10' >> /start.sh && \
+    echo 'echo "======================================="' >> /start.sh && \
+    echo 'echo "TU DIRECCION EN LA DARK WEB ES:"' >> /start.sh && \
+    echo 'cat /var/lib/tor/hidden_service/hostname' >> /start.sh && \
+    echo 'echo "======================================="' >> /start.sh && \
+    echo 'tail -f /dev/null' >> /start.sh && \
+    chmod +x /start.sh
+
+# Ejecutamos nuestro script blindado
+CMD ["/start.sh"]
