@@ -3,7 +3,7 @@ IMAGE_NAME = ft_onion
 CONTAINER_NAME = my_onion
 
 # Main rule: builds the image and runs the container
-all: build run logs onion
+all: build run logs 
 
 # Builds the Docker image without using the cache
 build:
