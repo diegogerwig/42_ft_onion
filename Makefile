@@ -1,0 +1,40 @@
+# Image and container names
+IMAGE_NAME = ft_onion
+CONTAINER_NAME = my_onion
+
+# Main rule: builds the image and runs the container
+all: build run
+
+# Builds the Docker image without using the cache
+build:
+	docker build --no-cache -t $(IMAGE_NAME) .
+
+# Runs the container in the background
+run:
+	docker run -d --name $(CONTAINER_NAME) $(IMAGE_NAME)
+	@echo "Container started. Wait about 10 seconds and use 'make onion' to see your URL."
+
+# Shows the container logs
+logs:
+	docker logs $(CONTAINER_NAME)
+
+# Directly shows the .onion address
+onion:
+	@echo "======================================="
+	@echo "YOUR DARK WEB ADDRESS IS:"
+	@docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname
+	@echo "======================================="
+
+# Stops and removes the container
+clean:
+	docker rm -f $(CONTAINER_NAME) || true
+
+# Removes the container and the Docker image for a deep clean
+fclean: clean
+	docker rmi -f $(IMAGE_NAME) || true
+
+# Deep cleans, then rebuilds and runs everything
+re: fclean all
+
+# Prevents conflicts if you have files named like these rules
+.PHONY: all build run logs onion clean fclean re
