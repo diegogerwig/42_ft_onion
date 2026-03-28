@@ -98,3 +98,10 @@ docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
 | `make clean` | Stop and remove the container |
 | `make fclean` | Remove container and image |
 | `make re` | Full rebuild from scratch |
+
+---
+
+## Brew
+
+brew install tor 
+brew install torsocks
