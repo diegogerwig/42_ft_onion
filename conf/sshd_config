@@ -3,10 +3,13 @@
 # Change the default SSH port to 4242 as required by the subject
 Port 4242
 
-# Security best practices (optional but recommended for the bonus)
+# Security hardening settings
 PermitRootLogin no
-PasswordAuthentication yes
+PasswordAuthentication no
 PubkeyAuthentication yes
-
-# Disallow empty passwords
 PermitEmptyPasswords no
+MaxAuthTries 3
+LoginGraceTime 20
+AllowUsers onionuser
+ClientAliveInterval 120
+ClientAliveCountMax 2
