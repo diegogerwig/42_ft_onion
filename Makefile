@@ -1,7 +1,7 @@
 IMAGE_NAME = ft_onion
 CONTAINER_NAME = my_onion
 
-all: build run logs 
+all: build run logs onion
 
 conf/onion_key:
 	@echo "Generating SSH keys..."
@@ -21,10 +21,10 @@ logs:
 	docker logs $(CONTAINER_NAME)
 
 onion:
-	@echo "======================================="
+	@echo "=============================================================="
 	@echo "YOUR DARK WEB ADDRESS IS:"
 	@docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname
-	@echo "======================================="
+	@echo "=============================================================="
 
 test-ssh:
 	@echo "Testing SSH connection through Tor..."
