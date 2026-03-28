@@ -5,11 +5,12 @@ CONTAINER_NAME = my_onion
 # Main rule: builds the image and runs the container
 all: build run logs 
 
-# Generates SSH keys automatically if they don't exist
+# Generates SSH keys automatically if they don't exist and sets strict permissions
 conf/onion_key:
 	@echo "Generating SSH keys..."
 	@mkdir -p conf
 	@ssh-keygen -t ed25519 -f conf/onion_key -q -N ""
+	@chmod 600 conf/onion_key
 
 # Builds the Docker image without using the cache
 build: conf/onion_key
@@ -32,11 +33,12 @@ onion:
 	@docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname
 	@echo "======================================="
 
-# Tests the SSH connection automatically through the Tor network
+# Tests the SSH connection automatically through the Tor network using torsocks
 test-ssh:
 	@echo "Testing SSH connection through Tor..."
-	@ONION_URL=$$(docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname) ; \
-	ssh -i conf/onion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="nc -X 5 -x 127.0.0.1:9050 %h %p" -p 4242 onionuser@$$ONION_URL
+	@chmod 600 conf/onion_key
+	@ONION_URL=$$(docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname | tr -d '\r\n') ; \
+	torsocks ssh -i conf/onion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@$$ONION_URL
 
 # Stops and removes the container
 clean:
