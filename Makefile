@@ -3,7 +3,7 @@ IMAGE_NAME = ft_onion
 CONTAINER_NAME = my_onion
 
 # Main rule: builds the image and runs the container
-all: build run
+all: build run logs onion
 
 # Builds the Docker image without using the cache
 build:
@@ -16,6 +16,7 @@ run:
 
 # Shows the container logs
 logs:
+	sleep 10
 	docker logs $(CONTAINER_NAME)
 
 # Directly shows the .onion address
