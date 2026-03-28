@@ -12,6 +12,13 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -s /bin/bash onionuser && \
     echo "onionuser:pwd4242" | chpasswd
 
+# Create the .ssh directory, copy the public key, and set strict permissions
+RUN mkdir -p /home/onionuser/.ssh
+COPY conf/onion_key.pub /home/onionuser/.ssh/authorized_keys
+RUN chown -R onionuser:onionuser /home/onionuser/.ssh && \
+    chmod 700 /home/onionuser/.ssh && \
+    chmod 600 /home/onionuser/.ssh/authorized_keys    
+
 # Prepare SSH directory and generate host keys to prevent silent crashes
 RUN mkdir -p /run/sshd
 RUN ssh-keygen -A
