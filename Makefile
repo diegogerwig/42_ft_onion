@@ -26,6 +26,11 @@ onion:
 	@docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname
 	@echo "======================================="
 
+# Tests the SSH connection locally inside the container (Debugging)
+test-local:
+	@echo "Probando SSH localmente. La contraseña es: password4242"
+	docker exec -it $(CONTAINER_NAME) ssh onionuser@127.0.0.1 -p 4242
+
 # Stops and removes the container
 clean:
 	docker rm -f $(CONTAINER_NAME) || true

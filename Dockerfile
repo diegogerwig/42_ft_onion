@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     tor \
     openssh-server \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for SSH access
@@ -26,7 +27,7 @@ RUN mkdir -p /var/lib/tor/hidden_service && \
     chown -R debian-tor:debian-tor /var/lib/tor/hidden_service && \
     chmod 700 /var/lib/tor/hidden_service
 
-# Copy the entrypoint script from the 'conf' directory
+# Copy the entrypoint script from the 'src' directory
 COPY src/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Fix line endings (in case the file was saved on Windows) and make it executable
