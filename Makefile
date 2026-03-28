@@ -36,9 +36,11 @@ onion:
 # Tests the SSH connection automatically through the Tor network using torsocks
 test-ssh:
 	@echo "Testing SSH connection through Tor..."
-	@chmod 600 conf/onion_key
+	@cp conf/onion_key /tmp/onion_key_tmp
+	@chmod 600 /tmp/onion_key_tmp
 	@ONION_URL=$$(docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname | tr -d '\r\n') ; \
-	torsocks ssh -i conf/onion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@$$ONION_URL
+	torsocks ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@$$ONION_URL
+	@rm -f /tmp/onion_key_tmp
 
 # Stops and removes the container
 clean:
