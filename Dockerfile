@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # Create a non-root user for SSH access
 RUN useradd -m -s /bin/bash onionuser && \
-    echo "onionuser:password4242" | chpasswd
+    echo "onionuser:pwd4242" | chpasswd
 
 # Prepare SSH directory and generate host keys to prevent silent crashes
 RUN mkdir -p /run/sshd

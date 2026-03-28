@@ -5,5 +5,4 @@ https://www.browserling.com/tor-testing
 
 
 
-
- docker exec my_onion apt-get install -y openssh-client && docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
+docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
