@@ -5,13 +5,14 @@ CONTAINER_NAME = my_onion
 # Main rule: builds the image and runs the container
 all: build run logs 
 
+
 # Builds the Docker image without using the cache
 build:
 	docker build --no-cache -t $(IMAGE_NAME) .
 
 # Runs the container in the background
 run:
-	docker run -d --name $(CONTAINER_NAME) $(IMAGE_NAME)
+	docker run -d --name $(CONTAINER_NAME) -p 4242:4242 $(IMAGE_NAME)
 	@echo "Container started. Wait about 10 seconds and use 'make onion' to see your URL."
 
 # Shows the container logs
@@ -29,7 +30,7 @@ onion:
 # Tests the SSH connection locally inside the container (Debugging)
 test-local:
 	@echo "Probando SSH localmente. La contraseña es: password4242"
-	docker exec -it $(CONTAINER_NAME) ssh onionuser@127.0.0.1 -p 4242
+	ssh -i conf/onion_key -o StrictHostKeyChecking=no onionuser@127.0.0.1 -p 4242
 
 # Stops and removes the container
 clean:
