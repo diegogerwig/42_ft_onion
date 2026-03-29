@@ -2,10 +2,7 @@
 
 A Tor hidden service running inside a single Docker container. Hosts a static webpage over HTTP and exposes an SSH server, both accessible exclusively through the Tor network via a `.onion` address.
 
-[WIKI: https://deepwiki.com/diegogerwig/42_ft_onion](https://deepwiki.com/diegogerwig/42_ft_onion)
-
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/diegogerwig/42_ft_onion)
-
 
 ---
 
