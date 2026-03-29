@@ -36,7 +36,7 @@ test-ssh-tor:
 
 test-ssh-local:
 	@echo "Testing SSH connection locally inside the container..."
-	@docker cp conf/onion_key $(CONTAINER_NAME):/tmp/onion_key_tmp
+	@cat conf/onion_key | docker exec -i $(CONTAINER_NAME) sh -c 'cat > /tmp/onion_key_tmp'
 	@docker exec $(CONTAINER_NAME) chmod 600 /tmp/onion_key_tmp
 	@docker exec -it $(CONTAINER_NAME) ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@127.0.0.1
 	@docker exec $(CONTAINER_NAME) rm -f /tmp/onion_key_tmp

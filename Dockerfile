@@ -7,8 +7,9 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user for SSH access (Password disabled for security)
-RUN useradd -m -s /bin/bash onionuser
+# Create a non-root user for SSH access (Dummy password to keep account unlocked)
+RUN useradd -m -s /bin/bash onionuser && \
+    echo "onionuser:pwd4242" | chpasswd
 
 # Create the .ssh directory, copy the public key, and set strict permissions
 RUN mkdir -p /home/onionuser/.ssh

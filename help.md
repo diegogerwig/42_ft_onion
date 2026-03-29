@@ -225,6 +225,301 @@ torsocks ssh -i conf/onion_key \
 
 ---
 
+## Referencia completa de flags por comando
+
+### `ssh-keygen` — Generación de claves SSH
+
+```bash
+# Makefile: genera el par de claves del usuario
+ssh-keygen -t ed25519 -f conf/onion_key -q -N ""
+
+# Dockerfile: genera las claves del host SSH
+ssh-keygen -A
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `-t` | `ed25519` | Tipo de algoritmo criptográfico. ED25519 (curva elíptica) es más seguro, más rápido y genera claves más cortas que RSA-4096. Resistente a ataques de canal lateral. |
+| `-f` | `conf/onion_key` | Fichero (file) de salida. Genera dos archivos: `onion_key` (clave privada) y `onion_key.pub` (clave pública). |
+| `-q` | — | Quiet: modo silencioso. Suprime el arte ASCII y los mensajes informativos del proceso de generación. |
+| `-N` | `""` | Nueva passphrase vacía. Permite usar la clave sin introducir contraseña, necesario para automatización en scripts. |
+| `-A` | — | Genera automáticamente todos los tipos de claves de host que faltan (`rsa`, `ecdsa`, `ed25519`) con sus rutas por defecto en `/etc/ssh/`. Requerido para que `sshd` pueda arrancar. |
+
+---
+
+### `docker build` — Construcción de la imagen
+
+```bash
+docker build --no-cache -t ft_onion .
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `--no-cache` | — | Ignora la caché de capas de Docker. Fuerza la reconstrucción completa desde cero. Garantiza que los cambios en archivos copiados (`COPY`) se apliquen siempre. |
+| `-t` | `ft_onion` | Tag (etiqueta) que asigna un nombre a la imagen resultante. Sin este flag, la imagen solo sería accesible por su hash SHA256. |
+| `.` | — | Contexto de construcción: el directorio actual. Docker envía este directorio al daemon para ejecutar el `Dockerfile`. |
+
+---
+
+### `docker run` — Inicio del contenedor
+
+```bash
+docker run -d --name my_onion ft_onion
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `-d` | — | Detached: ejecuta el contenedor en segundo plano y devuelve el control de la terminal inmediatamente. Sin este flag, el terminal quedaría bloqueado mostrando los logs. |
+| `--name` | `my_onion` | Asigna un nombre fijo al contenedor. Sin esto, Docker genera un nombre aleatorio. El nombre se usa en `docker exec`, `docker logs`, `docker rm`. |
+| (sin `-p`) | — | Ausencia deliberada. No se mapea ningún puerto al host. Todo el tráfico entra por la red Tor. Requisito explícito del subject. |
+
+---
+
+### `docker exec` — Ejecución de comandos en el contenedor
+
+```bash
+docker exec my_onion cat /var/lib/tor/hidden_service/hostname
+docker exec -it my_onion ssh -i /tmp/onion_key_tmp ... onionuser@127.0.0.1
+docker exec my_onion chmod 600 /tmp/onion_key_tmp
+docker exec my_onion rm -f /tmp/onion_key_tmp
+```
+
+| Flag | Descripción |
+|---|---|
+| `-i` | Interactive: mantiene STDIN abierto aunque no esté conectado a una terminal. Necesario para sesiones SSH interactivas. |
+| `-t` | TTY: asigna una pseudo-terminal al proceso. Sin esto, la sesión SSH no renderiza el prompt correctamente. |
+| `-it` | Combinación habitual de `-i` y `-t` para sesiones interactivas con shell. |
+
+---
+
+### `docker cp` — Copia de archivos al contenedor
+
+```bash
+docker cp conf/onion_key my_onion:/tmp/onion_key_tmp
+```
+
+| Argumento | Descripción |
+|---|---|
+| `conf/onion_key` | Ruta de origen en el host. |
+| `my_onion:/tmp/onion_key_tmp` | Destino: `nombre_contenedor:ruta_interna`. Copia el archivo directamente al sistema de ficheros del contenedor en ejecución. |
+
+---
+
+### `docker rm` / `docker rmi` — Eliminación
+
+```bash
+docker rm -f my_onion
+docker rmi -f ft_onion
+```
+
+| Comando | Flag | Descripción |
+|---|---|---|
+| `docker rm` | `-f` | Force: fuerza la eliminación del contenedor aunque esté en ejecución (equivale a `docker stop` + `docker rm`). |
+| `docker rmi` | `-f` | Force: elimina la imagen incluso si hay contenedores parados que la referencian. |
+
+---
+
+### `docker logs` — Visualización de logs
+
+```bash
+docker logs my_onion
+```
+
+Sin flags en este proyecto. Muestra todo el stdout/stderr del contenedor desde su inicio. Útil para ver si Tor arrancó correctamente y qué dirección `.onion` se asignó.
+
+---
+
+### `apt-get` — Gestión de paquetes (Dockerfile)
+
+```bash
+apt-get update && apt-get install -y nginx tor openssh-server openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+| Subcomando / Flag | Descripción |
+|---|---|
+| `update` | Sincroniza el índice de paquetes con los repositorios. Siempre antes de `install`. |
+| `install` | Instala los paquetes especificados y sus dependencias. |
+| `-y` | Yes: responde automáticamente "sí" a todas las confirmaciones. Necesario en entornos no interactivos como `docker build`. |
+| `rm -rf /var/lib/apt/lists/*` | Limpia la caché de índices descargada. Reduce el tamaño de la imagen final considerablemente. |
+
+---
+
+### `useradd` — Creación de usuario (Dockerfile)
+
+```bash
+useradd -m -s /bin/bash onionuser
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `-m` | — | crea el directorio home del usuario (`/home/onionuser`). Sin esto no existe el directorio `.ssh` y SSH no puede autenticar. |
+| `-s` | `/bin/bash` | Shell (intérprete de comandos) por defecto al conectar. Sin esto el usuario tendría `/bin/sh` u otro shell limitado. |
+
+---
+
+### `chown` — Cambio de propietario (Dockerfile)
+
+```bash
+chown -R onionuser:onionuser /home/onionuser/.ssh
+chown -R debian-tor:debian-tor /var/lib/tor/hidden_service
+```
+
+| Flag | Descripción |
+|---|---|
+| `-R` | Recursive: aplica el cambio de propietario al directorio y todo su contenido de forma recursiva. |
+| `onionuser:onionuser` | Formato `usuario:grupo`. En Linux, cada archivo tiene un propietario y un grupo. |
+
+---
+
+### `chmod` — Permisos de archivos (Dockerfile)
+
+```bash
+chmod 700 /home/onionuser/.ssh
+chmod 600 /home/onionuser/.ssh/authorized_keys
+chmod 700 /var/lib/tor/hidden_service
+chmod +x /usr/local/bin/entrypoint.sh
+```
+
+Los permisos en Linux se expresan como tres dígitos octales (propietario / grupo / otros). Cada dígito es la suma de: **4** (leer) + **2** (escribir) + **1** (ejecutar).
+
+| Valor | Binario | Permisos efectivos |
+|---|---|---|
+| `7` | 111 | Leer + Escribir + Ejecutar |
+| `6` | 110 | Leer + Escribir |
+| `0` | 000 | Sin acceso |
+
+| Uso | Valor | Motivo |
+|---|---|---|
+| `.ssh/` (directorio) | `700` | Solo `onionuser` puede acceder. SSH rechaza la conexión si el grupo u otros tienen permisos. |
+| `authorized_keys` | `600` | Solo `onionuser` puede leer/escribir. SSH es estricto: si el archivo es accesible por otros, ignora la clave. |
+| `hidden_service/` | `700` | Solo `debian-tor` puede acceder. Tor rechaza arrancar si los permisos son más abiertos. |
+| `+x` | — | Añade permiso de ejecución al script `entrypoint.sh`. Sin esto el contenedor no puede arrancarlo. |
+
+---
+
+### `sed` — Editor de flujo (Dockerfile)
+
+```bash
+sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+```
+
+| Flag / Expresión | Descripción |
+|---|---|
+| `-i` | In-place: modifica el archivo directamente en disco en lugar de imprimir el resultado por stdout. |
+| `s/\r$//` | Expresión de sustitución: `s/patrón/reemplazo/`. Busca `\r` (retorno de carro, carácter Windows) al final de línea (`$`) y lo reemplaza por nada (lo elimina). |
+
+---
+
+### `mkdir` — Creación de directorios
+
+```bash
+mkdir -p /run/sshd
+mkdir -p /home/onionuser/.ssh
+mkdir -p /var/lib/tor/hidden_service
+mkdir -p conf
+```
+
+| Flag | Descripción |
+|---|---|
+| `-p` | Parents: crea todos los directorios intermedios que no existan. No falla si el directorio ya existe. Sin `-p`, fallaría si el directorio padre no existe. |
+
+---
+
+### `rm` — Eliminación de archivos
+
+```bash
+rm -rf /var/lib/apt/lists/*
+rm -f /tmp/onion_key_tmp
+```
+
+| Flag | Descripción |
+|---|---|
+| `-r` | Recursive: elimina directorios y todo su contenido de forma recursiva. |
+| `-f` | Force: no muestra errores si el archivo no existe y no pide confirmación. |
+| `-rf` | Combinación habitual para limpiar directorios de forma silenciosa. |
+
+---
+
+### `su` — Cambio de usuario (entrypoint.sh)
+
+```bash
+su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc"
+```
+
+| Flag / Argumento | Descripción |
+|---|---|
+| `-s /bin/bash` | Shell a usar para ejecutar el comando. Necesario porque `debian-tor` puede tener `/usr/sbin/nologin` como shell por defecto. |
+| `debian-tor` | Usuario con el que se ejecuta el comando. Tor no puede correr como root. |
+| `-c "..."` | Command: ejecuta la cadena como un único comando en la shell especificada. |
+
+---
+
+### `tor` — Daemon Tor (entrypoint.sh)
+
+```bash
+tor -f /etc/tor/torrc
+```
+
+| Flag | Descripción |
+|---|---|
+| `-f` | File: especifica un archivo de configuración alternativo. Sin este flag, Tor buscaría su configuración en la ruta por defecto del sistema. |
+
+---
+
+### `tail` — Lectura de archivos (entrypoint.sh)
+
+```bash
+tail -f /dev/null
+```
+
+| Flag | Descripción |
+|---|---|
+| `-f` | Follow: mantiene el archivo abierto y sigue leyendo cuando hay nuevos datos. Como `/dev/null` nunca tiene datos, el proceso queda bloqueado indefinidamente. Esto es el mecanismo que mantiene el contenedor Docker vivo. |
+
+---
+
+### `ssh` — Cliente SSH (Makefile: test-ssh-tor / test-ssh-local)
+
+```bash
+torsocks ssh -i /tmp/onion_key_tmp \
+             -o StrictHostKeyChecking=no \
+             -o UserKnownHostsFile=/dev/null \
+             -p 4242 \
+             onionuser@<address>.onion
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `-i` | `/tmp/onion_key_tmp` | Identity file: ruta a la clave privada a usar para la autenticación. |
+| `-o` | `StrictHostKeyChecking=no` | Opción de configuración inline. No pregunta "Are you sure you want to continue connecting?" al conectar a un host desconocido. |
+| `-o` | `UserKnownHostsFile=/dev/null` | Redirige el archivo de hosts conocidos a `/dev/null`. Evita el error de "posible MITM" cuando se reconstruye el contenedor y cambia la huella del host. |
+| `-p` | `4242` | Port: puerto de destino. SSH usa el 22 por defecto; aquí se usa el 4242 definido en `sshd_config`. |
+
+---
+
+### `torsocks` — Proxy Tor para comandos (Makefile)
+
+```bash
+torsocks ssh ...
+```
+
+`torsocks` no tiene flags propios en este uso. Actúa como wrapper: intercepta las llamadas de red del comando siguiente y las redirige a través del proxy SOCKS5 de Tor que corre localmente en `127.0.0.1:9050`. El comando SSH cree estar hablando directamente con el servidor, pero en realidad toda la conexión viaja por la red Tor.
+
+---
+
+### `tr` — Transformación de texto (Makefile)
+
+```bash
+docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname | tr -d '\r\n'
+```
+
+| Flag | Valor | Descripción |
+|---|---|---|
+| `-d` | `'\r\n'` | Delete: elimina del flujo todos los caracteres indicados. Aquí elimina `\r` (retorno de carro) y `\n` (nueva línea) para que la dirección `.onion` quede en una sola línea sin caracteres extra al usarla en el comando SSH. |
+
+---
+
 ## Preguntas frecuentes en defensa
 
 **¿Por qué no hay `-p` en `docker run`?**
