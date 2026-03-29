@@ -18,7 +18,7 @@ RUN chown -R onionuser:onionuser /home/onionuser/.ssh && \
     chmod 700 /home/onionuser/.ssh && \
     chmod 600 /home/onionuser/.ssh/authorized_keys    
 
-# Prepare SSH directory and generate host keys to prevent silent crashes
+# Prepare SSH directory and generate host keys
 RUN mkdir -p /run/sshd
 RUN ssh-keygen -A
 

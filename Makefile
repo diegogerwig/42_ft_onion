@@ -50,4 +50,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all build run logs onion clean fclean re
+.PHONY: all build run clean fclean re
