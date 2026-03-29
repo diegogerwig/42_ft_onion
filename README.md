@@ -10,7 +10,7 @@ A Tor hidden service running inside a single Docker container. Hosts a static we
 make all
 ```
 
-Builds the image, starts the container, waits 10 seconds, and prints the logs including your `.onion` address.
+Builds the image, starts the container, waits 10 seconds, prints the logs, and displays your `.onion` address.
 
 To retrieve the address at any time:
 
@@ -25,7 +25,7 @@ make onion
 **Requirements:** Docker installed and running.
 
 ```bash
-# Build image
+# Build image (generates SSH keys if missing)
 make build
 
 # Start container
@@ -49,26 +49,22 @@ Access it with Tor Browser by navigating to your `.onion` address. You can also 
 
 ### SSH — port 4242
 
-An OpenSSH daemon runs on port 4242. Tor forwards `.onion:4242` to it.
+An OpenSSH daemon runs on port 4242. Tor forwards `.onion:4242` to it. Authentication is **key-based only** — the key pair is generated automatically by `make build` at `conf/onion_key`.
 
 ```bash
-# Credentials
-user:     onionuser
-password: pwd4242
+# Connect through Tor (requires torsocks)
+make test-ssh-tor
+
+# Or manually:
+torsocks ssh -i conf/onion_key -o StrictHostKeyChecking=no -p 4242 onionuser@<your-address>.onion
 ```
 
-To connect from outside, configure your SSH client to route through Tor:
+To test the SSH connection locally inside the container without Tor:
 
 ```bash
-ssh -o "ProxyCommand nc -X 5 -x 127.0.0.1:9050 %h %p" onionuser@<your-address>.onion -p 4242
-```
-
-To test the SSH connection locally inside the container:
-
-```bash
-make test-local
+make test-ssh-local
 # or
-docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
+docker exec -it my_onion ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -p 4242 onionuser@127.0.0.1
 ```
 
 ---
@@ -78,10 +74,10 @@ docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
 | File | Purpose |
 |---|---|
 | `conf/nginx.conf` | Nginx listens on port 80, serves `/var/www/html` |
-| `conf/sshd_config` | SSH on port 4242, root login disabled, password auth enabled |
+| `conf/sshd_config` | SSH on port 4242, root login disabled, password auth disabled, key auth only |
 | `conf/torrc` | Hidden service dir, maps `.onion:80` → `127.0.0.1:80` and `.onion:4242` → `127.0.0.1:4242` |
 | `conf/index.html` | Static page served over the hidden service |
-| `src/entrypoint.sh` | Starts sshd, nginx, and tor; prints the `.onion` address after bootstrap |
+| `src/entrypoint.sh` | Starts sshd, nginx, and tor in the background |
 
 ---
 
@@ -89,20 +85,23 @@ docker exec -it my_onion ssh onionuser@127.0.0.1 -p 4242
 
 | Rule | Description |
 |---|---|
-| `make all` | Build image, run container, show logs |
-| `make build` | Build Docker image (no cache) |
+| `make all` | Build image, run container, show logs, print `.onion` address |
+| `make build` | Generate SSH keys and build Docker image (no cache) |
 | `make run` | Start container in the background |
 | `make logs` | Show container logs |
 | `make onion` | Print the `.onion` address |
-| `make test-local` | SSH into the container via localhost for debugging |
+| `make test-ssh-tor` | SSH into the container via Tor |
+| `make test-ssh-local` | SSH into the container via localhost for debugging |
 | `make clean` | Stop and remove the container |
-| `make fclean` | Remove container and image |
+| `make fclean` | Remove container, image, and generated SSH keys |
 | `make re` | Full rebuild from scratch |
 
 ---
 
+## Dependencies
 
-## Brew
-
+```bash
+# LINUX 
 brew install tor 
-brew install torsocks
+brem install torsocks
+```
