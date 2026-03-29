@@ -26,13 +26,20 @@ onion:
 	@docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname
 	@echo "=============================================================="
 
-test-ssh:
+test-ssh-tor:
 	@echo "Testing SSH connection through Tor..."
 	@cp conf/onion_key /tmp/onion_key_tmp
 	@chmod 600 /tmp/onion_key_tmp
 	@ONION_URL=$$(docker exec $(CONTAINER_NAME) cat /var/lib/tor/hidden_service/hostname | tr -d '\r\n') ; \
 	torsocks ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@$$ONION_URL
 	@rm -f /tmp/onion_key_tmp
+
+test-ssh-local:
+	@echo "Testing SSH connection locally inside the container..."
+	@docker cp conf/onion_key $(CONTAINER_NAME):/tmp/onion_key_tmp
+	@docker exec $(CONTAINER_NAME) chmod 600 /tmp/onion_key_tmp
+	@docker exec -it $(CONTAINER_NAME) ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@127.0.0.1
+	@docker exec $(CONTAINER_NAME) rm -f /tmp/onion_key_tmp
 
 clean:
 	docker rm -f $(CONTAINER_NAME) || true
