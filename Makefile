@@ -3,13 +3,13 @@ CONTAINER_NAME = my_onion
 
 all: build run logs onion
 
-conf/onion_key:
+onion_key:
 	@echo "Generating SSH keys..."
 	@mkdir -p conf
 	@ssh-keygen -t ed25519 -f conf/onion_key -q -N ""
 	@chmod 600 conf/onion_key
 
-build: conf/onion_key
+build: onion_key
 	docker build --no-cache -t $(IMAGE_NAME) .
 
 run:
