@@ -1,15 +1,10 @@
 # SSH daemon configuration for ft_onion
 
-# Change the default SSH port to 4242 as required by the subject
+## Change the default SSH port to 4242 (required by the subject)
 Port 4242
 
-# Security hardening settings
+## Security hardening settings
 PermitRootLogin no
-PasswordAuthentication no
 PubkeyAuthentication yes
-PermitEmptyPasswords no
-MaxAuthTries 3
-LoginGraceTime 20
+PasswordAuthentication no
 AllowUsers onionuser
-ClientAliveInterval 120
-ClientAliveCountMax 2

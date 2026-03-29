@@ -50,8 +50,10 @@ Nginx serves a static `index.html` on port 80. Tor forwards `.onion:80` to it.
 Access it with Tor Browser by navigating to your `.onion` address. You can also test it without Tor Browser at [browserling.com/tor-testing](https://www.browserling.com/tor-testing).
 
 ### SSH — port 4242
+An OpenSSH daemon runs on port 4242. Tor forwards `.onion:4242` to it.
 
-An OpenSSH daemon runs on port 4242. Tor forwards `.onion:4242` to it. Authentication is **key-based only** — the key pair is generated automatically by `make build` at `conf/onion_key`.
+**Security Bonus:**
+Password authentication is completely disabled. Access is strictly limited to the `onionuser` account via ED25519 cryptographic keys.
 
 ```bash
 # Connect through Tor (requires torsocks)
