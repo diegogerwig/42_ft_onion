@@ -1,106 +1,255 @@
-1. El Makefile (Automatización y Control)
-El Makefile es tu panel de mandos.
+# ft_onion — Guía de Defensa
 
-Comando: ssh-keygen -t ed25519 -f conf/onion_key -q -N ""
+Guía técnica completa para la defensa del proyecto. Cubre la arquitectura, el propósito de cada archivo y los puntos clave que puede preguntar un evaluador.
 
--t ed25519: Especifica el tipo (type) de algoritmo criptográfico. ED25519 es el estándar moderno, más seguro y rápido que RSA.
+---
 
--f conf/onion_key: Especifica el fichero (file) de salida donde se guardará la llave.
+## Arquitectura general
 
--q: Modo quiet (silencioso). Evita que el comando imprima texto innecesario en la pantalla (como el "arte ASCII" que suele generar SSH).
+```
+                    INTERNET / TOR NETWORK
+                           │
+                    [Tor Browser / torsocks]
+                           │
+                    ┌──────▼──────┐
+                    │  Tor daemon │   ← gestiona la identidad .onion
+                    │ (debian-tor)│
+                    └──────┬──────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+        puerto 80                  puerto 4242
+              │                         │
+       ┌──────▼──────┐         ┌────────▼────────┐
+       │    Nginx    │         │   OpenSSH sshd  │
+       │  (HTTP web) │         │  (acceso shell) │
+       └──────┬──────┘         └────────┬────────┘
+              │                         │
+         index.html               onionuser
+              │                  (solo clave ED25519)
+        /var/www/html
+```
 
--N "": Establece una Nueva frase de paso (passphrase) vacía. Así no te pedirá contraseña cada vez que uses la llave.
+Todo el tráfico entra y sale exclusivamente por la red Tor. **No hay ningún puerto expuesto al host** (`docker run` sin `-p`), lo cual es un requisito explícito del subject.
 
-Comando: docker run -d --name $(CONTAINER_NAME) $(IMAGE_NAME)
+---
 
--d: Ejecuta el contenedor en modo detached (segundo plano). Te devuelve el control de la terminal.
+## Flujo de arranque
 
---name: Le asigna un nombre amigable (my_onion) en lugar de uno aleatorio.
+Cuando se ejecuta `make all`, ocurre lo siguiente en orden:
 
-Nota de Defensa: Si el evaluador pregunta por qué no hay un -p 80:80, debes responder: "El subject prohíbe abrir puertos hacia el host. El aislamiento debe ser total, el tráfico solo entra por la red Tor".
+1. **`make onion_key`** — Genera el par de claves ED25519 en `conf/` si no existen.
+2. **`docker build`** — Construye la imagen copiando configuraciones y compilando la imagen base Debian.
+3. **`docker run -d`** — Lanza el contenedor en segundo plano.
+4. **`entrypoint.sh`** — Dentro del contenedor, arranca `sshd`, `nginx` y `tor` en ese orden.
+5. **Bootstrap de Tor (~10s)** — Tor genera la clave del hidden service, escribe la dirección `.onion` en `/var/lib/tor/hidden_service/hostname` y establece el circuito.
+6. **`make onion`** — Lee y muestra la dirección `.onion` generada.
 
-Comando SSH de prueba: torsocks ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 4242 onionuser@$$ONION_URL
+---
 
-torsocks: Enruta el tráfico del comando siguiente a través de tu túnel Tor local.
+## Archivos del proyecto
 
--i /tmp/...: Especifica el archivo de identidad (tu llave privada).
+### `Dockerfile`
 
--o StrictHostKeyChecking=no: Le dice a SSH que no te pregunte "Are you sure you want to continue connecting?" si la llave del servidor es nueva.
+Define la imagen del contenedor a partir de `debian:bullseye-slim`.
 
--o UserKnownHostsFile=/dev/null: Envía el registro de máquinas conocidas a un "agujero negro" (/dev/null) en lugar de guardarlo en tu PC. Evita el famoso error de "Man-in-the-Middle" cuando reconstruyes el contenedor.
+**Paquetes instalados:**
 
--p 4242: Especifica el puerto al que quieres conectarte.
+| Paquete | Función |
+|---|---|
+| `nginx` | Servidor web que sirve `index.html` |
+| `tor` | Crea el túnel de red anónimo y gestiona la dirección `.onion` |
+| `openssh-server` | Daemon SSH accesible por la red Tor |
+| `openssh-client` | Permite hacer `ssh` desde dentro del contenedor (test local) |
 
-2. El Dockerfile (Construcción de la Imagen)
-Aquí defines cómo se instala y configura el sistema operativo base.
+**Puntos clave:**
 
-Comando: useradd -m -s /bin/bash onionuser
+```dockerfile
+RUN useradd -m -s /bin/bash onionuser
+```
+- `-m` → crea `/home/onionuser/`, necesaria para el directorio `.ssh`
+- `-s /bin/bash` → shell funcional al conectar por SSH
 
-useradd: Crea un usuario nuevo en Debian.
+```dockerfile
+RUN chmod 700 /home/onionuser/.ssh
+RUN chmod 600 /home/onionuser/.ssh/authorized_keys
+```
+- `700` → solo el propietario puede entrar al directorio (SSH lo rechaza si es más permisivo)
+- `600` → solo lectura/escritura del propietario sobre las claves (requisito estricto de OpenSSH)
 
--m: Obliga al sistema a crear la carpeta home del usuario (/home/onionuser), necesaria para guardar sus llaves SSH.
+```dockerfile
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+```
+- Elimina los retornos de carro de Windows (`\r`) que romperían el script en Linux si el archivo se editó en Windows.
 
--s /bin/bash: Define la shell por defecto del usuario. Así, al entrar por SSH, tendrás una consola funcional.
+```dockerfile
+RUN ssh-keygen -A
+```
+- Genera las claves del host SSH (`/etc/ssh/ssh_host_*`). Sin esto, `sshd` no puede arrancar.
 
-Los Permisos Octales (chmod 700 y 600)
+---
 
-chmod 700 /home/onionuser/.ssh: El número 7 significa que el propietario puede Leer (4) + Escribir (2) + Ejecutar (1) la carpeta. Los ceros significan que el grupo y los demás no pueden hacer nada.
+### `src/entrypoint.sh`
 
-chmod 600 /home/onionuser/.ssh/authorized_keys: El propietario puede Leer (4) + Escribir (2) el archivo, pero no ejecutarlo (porque es texto plano). SSH es sumamente paranoico y rechazará la conexión si estos permisos no son estrictamente estos.
+Script de arranque que se ejecuta al iniciar el contenedor.
 
-Comando de limpieza: RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+```bash
+#!/bin/bash
 
-sed: Es un editor de texto en línea de comandos.
+mkdir -p /run/sshd           # Directorio PID requerido por sshd
 
--i: Realiza el cambio in-place (sobreescribe el archivo original en lugar de solo imprimir el resultado).
+/usr/sbin/sshd               # Arranca SSH en primer plano brevemente, luego se daemoniza solo
 
-'s/\r$//': Es una expresión regular que busca los retornos de carro de Windows (\r) al final de la línea ($) y los elimina (//). Evita que el script falle si alguna vez se editó en Windows.
+nginx &                      # Nginx en segundo plano (daemon off; en nginx.conf lo requiere)
 
-3. El entrypoint.sh (El Motor de Arranque)
-Este script se ejecuta cuando el contenedor cobra vida.
+su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc" &   # Tor como usuario sin privilegios
 
-Comandos con &: nginx &
+echo "Waiting for the Tor network to bootstrap..."
 
-El ampersand (&) al final manda el proceso a ejecutarse en segundo plano (background). Esto es vital porque en nginx.conf tienes daemon off;, lo que haría que Nginx bloqueara la terminal para siempre. Con el &, la consola queda libre para ejecutar la siguiente línea.
+sleep 10                     # Tiempo para que Tor establezca el circuito
 
-Comando: su -s /bin/bash debian-tor -c "tor -f /etc/tor/torrc" &
+tail -f /dev/null            # Mantiene el contenedor vivo indefinidamente
+```
 
-su: Ejecuta un comando como si fueras otro usuario (substitute user). Por seguridad, Tor nunca debe ejecutarse como root.
+**Por qué `tail -f /dev/null`:** Docker termina el contenedor si el proceso principal (PID 1 = entrypoint.sh) acaba. Como los servicios corren en background con `&`, el script llegaría al final y mataría todo. Este comando bloquea para siempre leyendo un archivo vacío, manteniendo el contenedor activo.
 
--s /bin/bash: Obliga a usar bash temporalmente para lanzar el comando.
+**Por qué Tor corre como `debian-tor`:** Tor tiene protecciones internas que le impiden arrancar como root. `debian-tor` es el usuario sin privilegios creado automáticamente al instalar el paquete en Debian.
 
-debian-tor: Es el usuario nativo sin privilegios que se creó automáticamente al instalar Tor en Debian.
+---
 
--c "...": El comando exacto que queremos que ejecute ese usuario.
+### `conf/torrc`
 
-tor -f /etc/tor/torrc: Arranca el servicio Tor indicándole que lea el fichero (file) de configuración específico que tú creaste.
+Configuración del daemon Tor.
 
-Comando: tail -f /dev/null
+```
+HiddenServiceDir /var/lib/tor/hidden_service/
+HiddenServicePort 80 127.0.0.1:80
+HiddenServicePort 4242 127.0.0.1:4242
+```
 
-tail -f: Se queda leyendo continuamente (follow) las últimas líneas de un archivo.
+- **`HiddenServiceDir`** → Tor guarda aquí la clave privada del hidden service y el archivo `hostname` con la dirección `.onion`. El directorio debe pertenecer a `debian-tor` con permisos `700`.
+- **`HiddenServicePort`** → Actúa como proxy inverso interno: todo el tráfico que llega por la red Tor al puerto indicado se redirige a `localhost` en ese mismo puerto.
 
-/dev/null: Es un archivo vacío de Linux que nunca cambia.
+> **Punto de defensa:** La dirección `.onion` es un hash criptográfico derivado de la clave pública del hidden service, no una IP. Es estable mientras no se elimine el contenedor (o la carpeta del hidden service).
 
-El truco: Como lee un archivo vacío para siempre, el script nunca termina. En Docker, si el entrypoint termina, el contenedor se apaga. Esto mantiene el servidor encendido indefinidamente.
+---
 
-4. Fortificación (Bonus de Seguridad en sshd_config)
-Aquí están los puntos del Bonus. Debes saber defender por qué los has puesto:
+### `conf/sshd_config`
 
-Port 4242: El puerto estándar de SSH es el 22. Cambiarlo a 4242 (como pide el subject) evita los ataques automatizados de bots que solo buscan en el puerto 22.
+Configuración del daemon SSH con hardening de seguridad.
 
-PermitRootLogin no: Si un atacante entra, lo primero que intentará es ser administrador. Al bloquear al root directamente, le cortas el acceso total al sistema.
+```
+Port 4242
+PermitRootLogin no
+PubkeyAuthentication yes
+PasswordAuthentication no
+AllowUsers onionuser
+```
 
-PasswordAuthentication no: Elimina la posibilidad de ataques de "fuerza bruta" o diccionarios de contraseñas. O tienes la llave física (criptográfica), o no entras.
+| Directiva | Motivo de seguridad |
+|---|---|
+| `Port 4242` | Requerido por el subject. Evita bots que escanean el puerto 22 |
+| `PermitRootLogin no` | Impide que un atacante tome control total del sistema |
+| `PasswordAuthentication no` | Elimina ataques de fuerza bruta / diccionario |
+| `PubkeyAuthentication yes` | Solo se entra con la clave criptográfica correcta |
+| `AllowUsers onionuser` | Lista blanca: cualquier otro usuario del sistema es rechazado |
 
-AllowUsers onionuser: Es una "lista blanca". Si alguien descubre un usuario oculto en el sistema e intenta conectarse, SSH lo rechazará porque no está explícitamente en esta lista.
+---
 
-5. Configuración de Red Oculta (torrc y nginx.conf)
-torrc (El Puente Oculto):
+### `conf/nginx.conf`
 
-HiddenServiceDir /var/lib/tor/hidden_service/: Le dice a Tor dónde guardar de forma segura su clave privada y el archivo hostname (que contiene tu dirección .onion).
+Configuración del servidor web.
 
-HiddenServicePort 80 127.0.0.1:80: Instrucción vital. Le dice a Tor: "Todo el tráfico que llegue a la Dark Web por el puerto 80, envíalo a mi red local (127.0.0.1) en el puerto 80". Es un proxy inverso dentro del propio contenedor.
+```nginx
+daemon off;
+```
 
-nginx.conf:
+> **Punto clave:** Por defecto Nginx se desacopla de la terminal y se ejecuta en background. En Docker, si el proceso desaparece de la vista del PID manager, el contenedor puede pensar que falló. `daemon off;` fuerza a Nginx a quedarse en primer plano, controlado por el `&` del entrypoint.
 
-daemon off;: Por defecto, Nginx se desconecta de la terminal y se ejecuta en segundo plano. En arquitecturas Docker, se recomienda forzar a los programas principales a ejecutarse en primer plano, porque Docker necesita "ver" el proceso activo. Si un demonio se esconde, Docker a veces piensa que el servicio se ha caído y reinicia el contenedor.
+El servidor escucha en `0.0.0.0:80` y sirve `/var/www/html/index.html`. Tor redirige el tráfico `.onion:80` a este puerto internamente.
+
+---
+
+### `conf/index.html`
+
+Página estática servida a través del hidden service. Diseño minimalista con tema oscuro y fuente monoespaciada, coherente con el entorno de red Tor.
+
+---
+
+### `Makefile`
+
+Panel de control del proyecto.
+
+| Regla | Descripción |
+|---|---|
+| `make all` | Construye, arranca, espera 10s, muestra logs y dirección `.onion` |
+| `make build` | Genera claves SSH si no existen y construye la imagen sin caché |
+| `make run` | Arranca el contenedor en segundo plano |
+| `make onion` | Imprime la dirección `.onion` activa |
+| `make test-ssh-tor` | Conecta por SSH a través de Tor (requiere `torsocks` en el host) |
+| `make test-ssh-local` | Conecta por SSH a `127.0.0.1:4242` dentro del contenedor (sin Tor) |
+| `make clean` | Para y elimina el contenedor |
+| `make fclean` | Elimina contenedor, imagen y claves generadas |
+| `make re` | Reconstrucción completa desde cero |
+
+**Generación de claves:**
+
+```bash
+ssh-keygen -t ed25519 -f conf/onion_key -q -N ""
+```
+
+| Flag | Significado |
+|---|---|
+| `-t ed25519` | Algoritmo moderno, más seguro y compacto que RSA |
+| `-f conf/onion_key` | Ruta de salida (genera `onion_key` y `onion_key.pub`) |
+| `-q` | Modo silencioso, sin arte ASCII |
+| `-N ""` | Sin passphrase, para no requerir contraseña al usar la clave |
+
+**Comando de conexión SSH por Tor:**
+
+```bash
+torsocks ssh -i conf/onion_key \
+             -o StrictHostKeyChecking=no \
+             -o UserKnownHostsFile=/dev/null \
+             -p 4242 \
+             onionuser@<address>.onion
+```
+
+| Flag | Motivo |
+|---|---|
+| `torsocks` | Enruta la conexión SSH por el proxy Tor local |
+| `-i conf/onion_key` | Identidad (clave privada) a usar |
+| `StrictHostKeyChecking=no` | No pregunta confirmación en la primera conexión |
+| `UserKnownHostsFile=/dev/null` | No guarda la huella del host; evita el error MITM al reconstruir el contenedor |
+| `-p 4242` | Puerto SSH no estándar definido en `sshd_config` |
+
+---
+
+## Preguntas frecuentes en defensa
+
+**¿Por qué no hay `-p` en `docker run`?**
+El subject lo prohíbe expresamente. El aislamiento debe ser total: ningún puerto del contenedor se expone al host. El único punto de entrada es la red Tor.
+
+**¿Cómo se genera la dirección `.onion`?**
+Tor deriva la dirección como un hash de la clave pública del hidden service (v3 onion = 56 caracteres en base32). No es una IP registrada en ningún DNS. Mientras el directorio del hidden service no se borre, la dirección es estable.
+
+**¿Qué pasaría si alguien intenta conectarse con contraseña?**
+`PasswordAuthentication no` en `sshd_config` hace que el daemon rechace ese método de autenticación directamente, sin ni siquiera procesarlo.
+
+**¿Por qué ED25519 y no RSA?**
+ED25519 usa criptografía de curva elíptica: claves más cortas, operaciones más rápidas y resistencia a ataques de canal lateral que afectan a implementaciones RSA.
+
+**¿Cómo verías la dirección `.onion` si el Makefile no existiera?**
+```bash
+docker exec my_onion cat /var/lib/tor/hidden_service/hostname
+```
+
+**¿Cómo probarías que el SSH funciona sin Tor?**
+```bash
+make test-ssh-local
+# equivale a:
+docker exec -it my_onion ssh -i /tmp/onion_key_tmp -o StrictHostKeyChecking=no -p 4242 onionuser@127.0.0.1
+```
+
+**¿Por qué `sleep 10` en el entrypoint?**
+Tor necesita tiempo para establecer el circuito de anonimización y registrar el hidden service en la red. Menos de 10 segundos y el `hostname` podría no estar escrito todavía.
