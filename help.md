@@ -1,4 +1,4 @@
-# ft_onion — Guía Técnica
+# ft_onion | Guía Técnica
 
 Cubre la arquitectura, el propósito de cada archivo y los puntos clave.
 
