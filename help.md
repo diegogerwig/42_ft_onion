@@ -1,6 +1,6 @@
-# ft_onion — Guía Explicativa
+# ft_onion — Guía Técnica
 
-Guía técnica completa. Cubre la arquitectura, el propósito de cada archivo y los puntos clave.
+Cubre la arquitectura, el propósito de cada archivo y los puntos clave.
 
 ---
 
