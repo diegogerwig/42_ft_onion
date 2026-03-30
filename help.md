@@ -172,7 +172,7 @@ El servidor escucha en `0.0.0.0:80` y sirve `/var/www/html/index.html`. Tor redi
 
 ### `conf/index.html`
 
-Página estática servida a través del hidden service. Diseño minimalista con tema oscuro y fuente monoespaciada, coherente con el entorno de red Tor.
+Página estática servida a través del hidden service.
 
 ---
 
