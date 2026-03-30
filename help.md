@@ -1,6 +1,6 @@
-# ft_onion — Guía de Defensa
+# ft_onion — Guía Explicativa
 
-Guía técnica completa para la defensa del proyecto. Cubre la arquitectura, el propósito de cada archivo y los puntos clave que puede preguntar un evaluador.
+Guía técnica completa. Cubre la arquitectura, el propósito de cada archivo y los puntos clave.
 
 ---
 
